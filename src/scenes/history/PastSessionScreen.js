@@ -1,5 +1,6 @@
 import { useSelector } from "react-redux";
 import {
+    Button,
     View,
     Text,
     StyleSheet,
@@ -17,7 +18,7 @@ function BudgetGoalResult({session}) {
         return null;
     }
     let resultLabel;
-    if (session.results.budget > budget) {
+    if (parseFloat(session.results.budget) > parseFloat(budget)) {
         resultLabel = <Text style={styles.goalResultNegative}>exceeded</Text>;
     } else {
         resultLabel = <Text style={styles.goalResultPositive}>met</Text>;
@@ -44,7 +45,7 @@ function TimeGoalResult({session}) {
 }
 
 export default function PastSessionScreen({route, navigation}) {
-    const { sessionId } = route.params;
+    const { id: sessionId } = route.params;
     const session = useSelector(state => state.sessions.history.find(session => session.id == sessionId));
     const {width, height} = useWindowDimensions();
     const data = session.checkIns.map(checkIn => ({
@@ -117,6 +118,7 @@ export default function PastSessionScreen({route, navigation}) {
                     </View>
                 </View>
             </View>
+            <Button title="Back to History" onPress={() => navigation.goBack()} />
         </View>
     )
 }

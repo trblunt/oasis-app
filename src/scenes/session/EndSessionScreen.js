@@ -30,9 +30,10 @@ import { AirbnbRating } from 'react-native-ratings';
 
 import * as Notifications from 'expo-notifications';
 
-import { cancelRecurringCheckin } from '../../util/notify';
+import { cancelRecurringCheckin, cancelSessionReminders } from '../../util/notify';
 
 import { timeStr } from '../../util/format';
+import { useNavigation } from '@react-navigation/native';
 
 function GoalRating({ goal, setGoal }) {
     return (
@@ -40,47 +41,63 @@ function GoalRating({ goal, setGoal }) {
             <AirbnbRating
                 count={5}
                 reviews={["Not at all", "A little", "Somewhat", "Mostly", "Completely"]}
-                defaultRating={3}
+                defaultRating={5}
                 onFinishRating={(rating) => setGoal(rating)}
             />
         </View>
     )
 }
 
-export default function EndSessionScreen({ navigation }) {
+const minusOneDay = (date) => {
+    let newDate = new Date(date);
+    newDate.setTime(newDate.getTime() - 24 * 60 * 60 * 1000);
+    return newDate;
+}
+
+export default function EndSessionScreen() {
     const dispatch = useDispatch();
     const sessions = useSelector(selectSessions);
+    const navigation = useNavigation();
     const currentSession = useSelector(selectCurrentSession);
-    const [finalGoalRating, setFinalGoalRating] = useState(3);
-    const [finalBudget, setFinalBudget] = useState(currentSession.goals.budget);
+    const [finalGoalRating, setFinalGoalRating] = useState(5);
+    const [finalBudgetText, setFinalBudget] = useState(currentSession.goals.budget);
+    const finalBudget = () => {
+        let num = parseFloat(finalBudgetText);
+        if (isNaN(num)) {
+            return null;
+        } else {
+            return num;
+        }
+    }
     const [finalTime, setFinalTime] = useState(new Date());
-    useEffect(() => {
-        cancelRecurringCheckin();
-    }, []);
     return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
             <View style={styles.container}>
                 <Text style={styles.title}>Session Retrospective</Text>
                 <View style={styles.retrospective}>
-                    <Text style={styles.retrospective_body}>How well do you think you did at sticking to your goals overall?</Text>
+                    <Text style={styles.retrospective_body}>Did you stick to your goals for this session?</Text>
                     <GoalRating goal={finalGoalRating} setGoal={setFinalGoalRating} />
-                    <Text style={styles.retrospective_body}>How much money did you take out to gamble with this session?</Text>
-                    <View style={styles.inline_input}>
-                        <Text style={styles.retrospective_body}>$</Text>
-                        <TextInput style={styles.input} onChangeText={setFinalBudget} value={finalBudget} keyboardType="numeric" />
-                    </View>
-                    <Text style={styles.retrospective_body}>What time did you stop gambling?</Text>
-                    <DateTimePicker
-                        value={finalTime}
-                        mode="time"
-                        style={styles.timePicker}
-                        is24Hour={false}
-                        display="default"
-                        onChange={(event, selectedDate) => {
-                            const currentDate = selectedDate || finalTime;
-                            setFinalTime(currentDate);
-                        }}
-                    />
+                    {currentSession.goals.budget &&
+                        (<View style={styles.goalContainer}><Text style={styles.retrospective_body}>How much money did you take out to gamble with this session?</Text>
+                            <View style={styles.inline_input}>
+                                <Text style={styles.retrospective_body}>$</Text>
+                            <TextInput style={styles.input} onChangeText={setFinalBudget} value={finalBudgetText} keyboardType="numeric" />
+                            </View></View>)
+                    }
+                    {currentSession.goals.time &&
+                        (<View style={styles.goalContainer}><Text style={styles.retrospective_body}>What time did you stop gambling?</Text>
+                            <DateTimePicker
+                                value={finalTime}
+                                mode="time"
+                                style={styles.timePicker}
+                                is24Hour={false}
+                                display="default"
+                                onChange={(event, selectedDate) => {
+                                    const currentDate = selectedDate || finalTime;
+                                    setFinalTime(currentDate);
+                                }}
+                            />
+                        </View>)}
                 </View>
                 <View style={styles.buttonContainer}>
                     <Button title="Cancel" onPress={() => {
@@ -90,6 +107,8 @@ export default function EndSessionScreen({ navigation }) {
                         }));
                     }} />
                     <Button title="Confirm" onPress={() => {
+                        cancelRecurringCheckin()
+                        cancelSessionReminders()
                         dispatch(updateSession({
                             ...currentSession,
                             state: SessionsState.Ended,
@@ -103,11 +122,19 @@ export default function EndSessionScreen({ navigation }) {
                             ],
                             results: {
                                 time: finalTime.getTime(),
-                                budget: finalBudget,
+                                budget: finalBudget(),
                                 rating: finalGoalRating,
                             }
                         }));
-                    }} />
+                        navigation.navigate('History', {
+                            screen: 'Past Session',
+                            params: {
+                                id: currentSession.id
+                            }
+                        });
+                    }} disabled={
+                        (finalBudget() == null && currentSession.goals.budget)
+                    } />
                 </View>
             </View>
         </TouchableWithoutFeedback>
@@ -166,4 +193,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
+    goalContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    }
 });

@@ -26,25 +26,69 @@ import { FontAwesome } from '@expo/vector-icons';
 
 import uuid from 'react-native-uuid';
 
-import { newSession } from '../../store/reducers/sessionsSlice';
+import { newSession, selectCurrentSession } from '../../store/reducers/sessionsSlice';
 
-export default function NewSessionScreen({ navigation }) {
+import { scheduleRecurringCheckin, CHECK_IN_FREQUENCY, scheduleSessionReminders } from '../../util/notify';
+
+const plusOneDay = (date) => {
+    let newDate = new Date(date);
+    newDate.setTime(newDate.getTime() + 24 * 60 * 60 * 1000);
+    return newDate;
+};
+
+
+export default function StartSessionScreen({ navigation }) {
 
     const dispatch = useDispatch();
 
-    const initialTimeGoal = new Date();
-    initialTimeGoal.setTime(initialTimeGoal.getTime() + 60 * 60 * 1000);
+    const initialTimeGoal = () => {
+        let goal = new Date();
+        goal.setTime(goal.getTime() + 60 * 60 * 1000);
+        return goal;
+    };
 
-    const [budget, setBudget] = useState(null);
-    const [time, setTime] = useState(initialTimeGoal);
+    const [budgetText, setBudget] = useState(null);
+    const budget = () => {
+        let num = parseFloat(budgetText);
+        if (isNaN(num)) {
+            return null;
+        }   
+        return num;
+    };
 
-    const [budgetEnabled, setBudgetEnabled] = useState(true);
+    const [time, setTime] = useState(initialTimeGoal());
+
+    const timeToday = () => {
+        let today = new Date();
+        today.setHours(time.getHours());
+        today.setMinutes(time.getMinutes());
+        today.setSeconds(time.getSeconds());
+        today.setMilliseconds(time.getMilliseconds());
+        return today;
+    };
+
+
+    const [budgetEnabled, setBudgetEnabledImpl] = useState(true);
+    const setBudgetEnabled = (value) => {
+        if (!value) {
+            setBudget(null);
+        }
+        setBudgetEnabledImpl(value);
+    };
+    
     const [timeEnabled, setTimeEnabled] = useState(true);
 
-    const sessionGoals = () => ({
-        time: timeEnabled ? time.getTime() : null,
-        budget: budgetEnabled ? budget : null
-    });
+    const sessionGoals = () => {
+        console.log("goals")
+        console.log(time.getTime())
+        console.log(new Date().getTime())
+        let goals = {
+            time: timeEnabled ? ((timeToday().getTime() > new Date().getTime()) ? timeToday().getTime() : plusOneDay(timeToday()).getTime()) + (60 * 1000) - 1 : null,
+            budget: (budgetEnabled && budget()) ? budget() : null
+        }
+        console.log(goals)
+        return goals
+    };
 
     // Each goal should have a header, description, enable toggle, and a value input
 
@@ -54,7 +98,7 @@ export default function NewSessionScreen({ navigation }) {
                 <Text style={styles.title}>Let's set some goals for your session.</Text>
                 <View style={styles.goal_container}>
                     <View style={styles.goal_top}>
-                        <Text style={styles.goal_header}>Budget</Text>
+                        <Text style={budgetEnabled ? styles.goal_header : styles.goal_header_disabled}>Budget Goal</Text>
                         <Switch
                             style={styles.goal_enable}
                             value={budgetEnabled}
@@ -62,24 +106,25 @@ export default function NewSessionScreen({ navigation }) {
                         />
                     </View>
                     <View style={styles.goal_input}>
-                        <FontAwesome name="dollar" size={24} color="black" style={{
-                            marginRight: 10
+                        <FontAwesome name="dollar" size={24} color={budgetEnabled ? "black" : "#ccc"} style={{
+                            marginRight: 15
                         }}/>
                         <TextInput
                             placeholder="0.00"
                             keyboardType="numeric"
-                            value={budget}
+                            value={budgetText}
                             onChangeText={setBudget}
                             style={{
                                 fontSize: 24,
                             }}
+                            editable={budgetEnabled}
                         />
                     </View>
-                    <Text style={styles.goal_description}>Set a limit on how much money you are willing to gamble with today.</Text>
+                    <Text style={budgetEnabled ? styles.goal_description : styles.goal_description_disabled}>How much money you are willing to gamble with today?</Text>
                 </View>
                 <View style={styles.goal_container}>
                     <View style={styles.goal_top}>
-                        <Text style={styles.goal_header}>Time</Text>
+                        <Text style={timeEnabled ? styles.goal_header : styles.goal_header_disabled}>Time Goal</Text>
                         <Switch
                             style={styles.goal_enable}
                             value={timeEnabled}
@@ -87,7 +132,7 @@ export default function NewSessionScreen({ navigation }) {
                         />
                     </View>
                     <View style={styles.goal_input}>
-                        <FontAwesome name="clock-o" size={24} color="black" style={{
+                        <FontAwesome name="clock-o" size={24} color={timeEnabled ? "black" : "#ccc"} style={{
                             marginRight: 10
                         }} />
                         <DateTimePicker
@@ -99,14 +144,17 @@ export default function NewSessionScreen({ navigation }) {
                                 const currentDate = selectedDate || time;
                                 setTime(currentDate);
                             }}
+                            disabled={!timeEnabled}
                         />
                     </View>
-                    <Text style={styles.goal_description}>Set a limit on how much time you are willing to spend gambling today.</Text>
+                    <Text style={timeEnabled ? styles.goal_description : styles.goal_description_disabled}>What time would you like to stop gambling by today?</Text>
                 </View> 
                 <Button
                     title="Start Session" 
+                    disabled = {(sessionGoals().time === null || budgetEnabled) && sessionGoals().budget === null}
                     onPress={() => {
                         console.log(sessionGoals());
+                        scheduleRecurringCheckin();
                         dispatch(
                             newSession({
                                 goals: sessionGoals(),
@@ -151,11 +199,22 @@ const styles = StyleSheet.create({
     goal_header: {
         fontSize: 20,
         fontWeight: 'bold',
+    },
+    goal_header_disabled: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#ccc',
     },  
     goal_description: {
         fontSize: 12,
         textAlign: 'center',
         fontWeight: '300',
+    },
+    goal_description_disabled: {
+        fontSize: 12,
+        textAlign: 'center',
+        fontWeight: '300',
+        color: '#ccc',
     },
     goal_input: {
         flexDirection: 'row',

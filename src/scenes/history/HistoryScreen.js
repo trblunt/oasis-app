@@ -1,6 +1,6 @@
 import { Button, FlatList, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectSessions, addSession, removeSession, reset } from '../../store/reducers/sessionsSlice';
+import { selectSessions, addSession, removeSession, reset, SessionsState } from '../../store/reducers/sessionsSlice';
 import { FontAwesome, FontAwesome5 } from '@expo/vector-icons';
 import { grade, gradeEmoji } from '../../util/sessionStats';
 import { timeStr, dateStr, shortDateStr } from '../../util/format';
@@ -55,9 +55,13 @@ function SessionRow({ session, navigation }) {
     return (
         <TouchableOpacity 
             style={styles.sessionRow} 
-            onPress={
-                () => navigation.navigate('Past Session', { sessionId: session.item.id })
-            }
+            onPress={() => {
+                if (session.item.state == SessionsState.Ended) {
+                    navigation.navigate('Past Session', { id: session.item.id })
+                } else {
+                    navigation.navigate('Session')
+                }
+            }}
         >
             <FontAwesome5 name="dice" size={24} color={color} />
             <View style={styles.sessionRowDetails}>
@@ -77,23 +81,20 @@ function SessionRowSeparator() {
 }
 
 function PerformanceGraph({sessions}) {
-    const data = sessions.map(session => ({
-        index: session.start,
-        value: grade(session),
-    }))
+    const data = sessions
+        .filter(session => session.state == SessionsState.Ended)
+        .map((session, index) => ({
+            index: index,
+            time: session.start,
+            value: grade(session),
+        }))
     // Only show the last 8 sessions in the list
     data.splice(0, data.length - 8)
     const contentInset = { top: 10, bottom: 10, left: 10, right: 10 }
     const xAxisHeight = 30
-    const xLabel = (time) => {
+    const xLabel = (index) => {
+        let time = data[index].time
         let label = shortDateStr(time)
-        for (let i = 0; i < data.length; i++) {
-            if (data[i].index < time && shortDateStr(data[i].index) == label) {
-                return ''
-            } else if (data[i].index == time) {
-                break
-            }
-        }
         return label
     }
     const yLabel = (grade) => {
@@ -155,28 +156,43 @@ function PerformanceGraph({sessions}) {
 export default function HistoryScreen({navigation}) {
     const sessions = useSelector(selectSessions);
     const dispatch = useDispatch();
+
+    const shouldShowGraph = () => {
+        return sessions.filter(session => session.state == SessionsState.Ended).length > 0
+    }
+
+    const shouldShowPastSessions = () => {
+        return sessions.length > 0
+    }
+
     return (
         <View style={styles.container}>
             <View style={styles.overviewCard}>
-                <Text style={styles.overviewCardHeader}>Overview</Text>
+                <Text style={styles.overviewCardHeader}>Progress</Text>
                 <View style={styles.generalGradeGraph}>
-                    <PerformanceGraph sessions={sessions} />
+                    {shouldShowGraph() ? (
+                        <PerformanceGraph sessions={sessions} /> 
+                    ) : (
+                        <Text style={styles.noSessionsText}>Record a session to see your progress over time.</Text>
+                    )}
                 </View>
                 <Text style={styles.overviewBlurb}>{overviewBlurb()}</Text>
             </View>
-            <View style={styles.pastSessionsContainer}>
-                <Text style={styles.pastSessionsHeader}>Past Sessions</Text>
-                <FlatList 
-                    data={sessions.slice().reverse()} 
-                    style={styles.pastSessionsList}
-                    renderItem={( session ) => SessionRow({ session, navigation })}
-                    keyExtractor={session => session.id}
-                    ItemSeparatorComponent={SessionRowSeparator}
-                />
-                <Text style={styles.pastSessionsFooter}>See your progress over time.</Text>
-            </View>
+            {shouldShowPastSessions() && (
+                <View style={styles.pastSessionsContainer}>
+                    <Text style={styles.pastSessionsHeader}>Past Sessions</Text>
+                    <FlatList 
+                        data={sessions.slice().reverse()} 
+                        style={styles.pastSessionsList}
+                        renderItem={( session ) => SessionRow({ session, navigation })}
+                        keyExtractor={session => session.id}
+                        ItemSeparatorComponent={SessionRowSeparator}
+                    />
+                    <Text style={styles.pastSessionsFooter}>View details of previous sessions.</Text>
+                </View>
+            )}
             <View style={{flex: 1}}></View>
-            <Button color="#FF0000" title="Reset" onPress={() => dispatch(reset())} />
+            <Button color="#FF0000" title="Reset All Data (Debug)" onPress={() => dispatch(reset())} />
         </View>
     )
 }
@@ -260,7 +276,19 @@ const styles = StyleSheet.create({
     },
     sessionRowEmoji: {
         fontSize: 24,
-    }
+    },
+    noSessionsText: {
+        fontSize: 16,
+        color: '#999',
+        textAlign: 'center',
+        fontWeight: 'light',
+        marginBottom: 30,
+    },
+    generalGradeGraph: {
+        width: '100%',
+        alignContent: 'center',
+        justifyContent: 'center',
+    },
 
 });
 

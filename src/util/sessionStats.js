@@ -105,7 +105,7 @@ export function gradeEmoji(x) {
     }
 
     // Calculate the index of the emoji to return
-    const emojiIndex = Math.floor(theGrade * emojis.length);
+    const emojiIndex = Math.min(Math.floor(theGrade * emojis.length), emojis.length - 1);
 
     console.log(emojiIndex)
 

@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -91,10 +91,19 @@ export default function App() {
       if (!await allowsNotificationsAsync()) {
         await Notifications.requestPermissionsAsync();
       }
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+      }
       Notifications.addNotificationResponseReceivedListener(async (response) => {
         console.log(await response.notification.request.content.data);
         console.log(await Notifications.getAllScheduledNotificationsAsync());
         console.log(await Notifications.getPresentedNotificationsAsync());
+        Notifications.dismissAllNotificationsAsync();
       });
     }
     registerNotification();

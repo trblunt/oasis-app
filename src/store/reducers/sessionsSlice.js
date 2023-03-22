@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import uuid from 'react-native-uuid';
+import { scheduleSessionReminders } from '../../util/notify';
 
 const initialState = {
     history: [],
@@ -16,14 +17,16 @@ export const sessionsSlice = createSlice({
     initialState,
     reducers: {
         newSession: (state, action) => {
-            state.history.push({
+            let session = {
                 id: uuid.v4(),
                 goals: action.payload.goals || {},
                 start: new Date().getTime(),
                 end: null,
                 checkIns: [],
                 state: SessionsState.Started
-            });
+            };
+            state.history.push(session);
+            scheduleSessionReminders(session);
         },
         removeSession: (state, action) => {
             state.history = state.history.filter((session) => session.id !== action.payload);

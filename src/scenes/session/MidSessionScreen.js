@@ -35,7 +35,7 @@ function GoalRating({ goal, setGoal }) {
             <AirbnbRating
                 count={5}
                 reviews={["Not at all", "A little", "Somewhat", "Mostly", "Completely"]}
-                defaultRating={3}
+                defaultRating={5}
                 onFinishRating={(rating) => setGoal(rating)}
             />
         </View>
@@ -46,15 +46,11 @@ export default function MidSessionScreen({ navigation }) {
     const dispatch = useDispatch();
     const sessions = useSelector(selectSessions);
     const [showCheckin, setShowCheckin] = useState(false);
-    const [goalRating, setGoalRating] = useState(3);
+    const [goalRating, setGoalRating] = useState(5);
     const currentSession = useSelector(selectCurrentSession);
     // budgetGoal is currentSession.goals.budget
     const budgetGoal = currentSession.goals.budget;
     const timeGoal = currentSession.goals.time;
-
-    useEffect(() => {
-        scheduleRecurringCheckin();
-    }, []);
 
     const lastCheckinTime = () => {
         if (currentSession.checkIns.length > 0) {
@@ -110,6 +106,7 @@ export default function MidSessionScreen({ navigation }) {
                             ]
                         };
                         setShowCheckin(false);
+                        scheduleRecurringCheckin();
                         dispatch(updateSession(newSession));
                     }} />
                 </View>)}
